@@ -1,9 +1,9 @@
 # Build stage
 FROM maven:3.8.4-openjdk-17-slim AS build
 WORKDIR /app
-COPY backend/pom.xml ./
-RUN mvn dependency:go-offline
-COPY backend/src ./src
+# Copy everything from the backend folder to the root of our build container
+COPY backend/ .
+# Build the jar
 RUN mvn package -DskipTests
 
 # Run stage
