@@ -1,8 +1,7 @@
 # Build stage
 FROM maven:3.8.4-openjdk-17-slim AS build
 WORKDIR /app
-# Correct paths for root context
-COPY backend/pom.xml .
+COPY backend/pom.xml ./
 RUN mvn dependency:go-offline
 COPY backend/src ./src
 RUN mvn package -DskipTests
