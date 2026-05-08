@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168')
     ? `http://${window.location.hostname}:8080/api`
-    : `https://${window.location.hostname}/api`); // Fallback for production
+    : 'https://internship-production-c9f5.up.railway.app/api');
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
