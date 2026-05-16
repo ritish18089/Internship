@@ -106,7 +106,7 @@ public class AuthController {
             return ResponseEntity.ok("OTP sent successfully");
         } catch (Exception e) {
             System.err.println("Failed to send OTP to " + email + ": " + e.getMessage());
-            return ResponseEntity.internalServerError().body("Failed to send OTP");
+            return ResponseEntity.internalServerError().body("Failed to send OTP: " + e.getMessage());
         }
     }
 
