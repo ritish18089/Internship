@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { Footer } from '../components/Footer';
 import { api } from '../lib/api';
@@ -15,6 +15,7 @@ export const LoginPage = ({ role }: LoginPageProps) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -119,21 +120,30 @@ export const LoginPage = ({ role }: LoginPageProps) => {
                 <Link to="/forgot-password" className="text-[10px] font-bold text-accent hover:underline uppercase tracking-wide">Forgot Password?</Link>
               )}
             </div>
-            <input 
-              type="password" 
-              id="user_secure_access"
-              name="user_secure_access"
-              required
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError('');
-              }}
-              className="input-field"
-              placeholder="••••••••"
-              disabled={loading}
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                id="user_secure_access"
+                name="user_secure_access"
+                required
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError('');
+                }}
+                className="input-field pr-12"
+                placeholder="••••••••"
+                disabled={loading}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? 'Authenticating...' : 'Sign In'}

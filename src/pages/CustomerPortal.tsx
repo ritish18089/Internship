@@ -19,7 +19,10 @@ import {
   Lock,
   Menu,
   X,
-  Edit2
+  Edit2,
+  Zap,
+  Film,
+  Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Car, ServiceRequest, Notification } from '../types';
@@ -27,6 +30,9 @@ import { StatusBadge } from '../components/StatusBadge';
 import { cn } from '../lib/utils';
 import { Logo } from '../components/Logo';
 import { api } from '../lib/api';
+import { VehicleTwin } from '../components/VehicleTwin';
+import { VideoDiagnostic } from '../components/VideoDiagnostic';
+import { RepairProofGallery } from '../components/RepairProofGallery';
 
 
 interface CustomerPortalProps {
@@ -39,7 +45,7 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cars' | 'garrage' | 'history' | 'profile' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cars' | 'garrage' | 'history' | 'profile' | 'settings' | 'visual'>('dashboard');
   const [settingsSubTab, setSettingsSubTab] = useState<'profile' | 'security'>('profile');
 
   const [showAddCar, setShowAddCar] = useState(false);
@@ -48,25 +54,34 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
   const [showEditCar, setShowEditCar] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
+  const [showTwin, setShowTwin] = useState(false);
+  const [selectedCarForTwin, setSelectedCarForTwin] = useState<Car | null>(null);
+  const [priceEstimate, setPriceEstimate] = useState<any>(null);
+  const [loadingEstimate, setLoadingEstimate] = useState(false);
+  const [selectedServiceForProof, setSelectedServiceForProof] = useState<string | null>(null);
+  const [pricingConfigs, setPricingConfigs] = useState<any[]>([]);
 
-  const SERVICE_COSTS: Record<string, number> = {
-    "Full System Diagnostics": 900,
-    "Brake System Overhaul": 1200,
-    "Performance Tuning": 1500,
-    "Suspension Geometry": 1000,
-    "Battery Health Check": 500,
-    "Fluid Management": 800,
-    "Electrical System Check": 750,
-    "Other": 500
-  };
 
   // New Car State
-  const [newCar, setNewCar] = useState({ brand: '', model: '', number: '' });
+  const [newCar, setNewCar] = useState({ 
+    brand: '', 
+    model: '', 
+    number: '', 
+    vin: '', 
+    purchaseDate: '', 
+    fuelType: 'PETROL', 
+    transmission: 'MANUAL', 
+    mileage: 0, 
+    insuranceExpiry: '', 
+    pucExpiry: '', 
+    warrantyExpiry: '' 
+  });
 
   // New Request State
   const [newRequest, setNewRequest] = useState({ 
     carId: '', 
     serviceType: '', 
+    customServiceType: '',
     bookingDate: '', 
     bookingTime: '09:00 AM',
     cost: 0
@@ -116,14 +131,16 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [carsRes, requestsRes, notificationsRes] = await Promise.all([
+      const [carsRes, requestsRes, notificationsRes, pricingRes] = await Promise.all([
         api.get('/cars'),
         api.get('/services/my'),
-        api.get('/notifications/my')
+        api.get('/notifications/my'),
+        api.get('/pricing/configs')
       ]);
       setCars(carsRes.data);
       setRequests(requestsRes.data);
       setNotifications(notificationsRes.data);
+      setPricingConfigs(pricingRes.data);
     } catch (err) {
       console.error('Failed to fetch data', err);
     } finally {
@@ -150,12 +167,43 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
     }
   };
 
+  useEffect(() => {
+    if (newRequest.serviceType) {
+      fetchEstimate(newRequest.serviceType);
+    }
+  }, [newRequest.serviceType]);
+
+  const fetchEstimate = async (type: string) => {
+    setLoadingEstimate(true);
+    try {
+      const response = await api.get(`/pricing/estimate?serviceType=${encodeURIComponent(type)}`);
+      setPriceEstimate(response.data);
+      setNewRequest(prev => ({ ...prev, cost: response.data.totalEstimate }));
+    } catch (err) {
+      console.error('Failed to fetch estimate', err);
+    } finally {
+      setLoadingEstimate(false);
+    }
+  };
+
   const handleAddCar = async () => {
     if (!newCar.brand || !newCar.model || !newCar.number) return;
     try {
       const response = await api.post('/cars', newCar);
       setCars([...cars, response.data]);
-      setNewCar({ brand: '', model: '', number: '' });
+      setNewCar({ 
+        brand: '', 
+        model: '', 
+        number: '', 
+        vin: '', 
+        purchaseDate: '', 
+        fuelType: 'PETROL', 
+        transmission: 'MANUAL', 
+        mileage: 0, 
+        insuranceExpiry: '', 
+        pucExpiry: '', 
+        warrantyExpiry: '' 
+      });
       setShowAddCar(false);
     } catch (err) {
       alert('Failed to add vehicle');
@@ -186,7 +234,7 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
     }
     try {
       const response = await api.post('/services', {
-        serviceType: newRequest.serviceType,
+        serviceType: newRequest.serviceType === 'Others' ? newRequest.customServiceType : newRequest.serviceType,
         car: { id: newRequest.carId },
         bookingDate: newRequest.bookingDate,
         bookingTime: newRequest.bookingTime,
@@ -360,6 +408,7 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
           <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }} />
           <SidebarItem id="cars" icon={CarIcon} label="My Vehicles" onClick={() => { setActiveTab('cars'); setIsSidebarOpen(false); }} />
           <SidebarItem onClick={() => { setShowRequest(true); setIsSidebarOpen(false); }} icon={PlusCircle} label="Request for Service" />
+          <SidebarItem id="visual" icon={Video} label="Visual Diagnostics" onClick={() => { setActiveTab('visual'); setIsSidebarOpen(false); }} />
           <SidebarItem id="profile" icon={UserIcon} label="Profile" onClick={() => { setActiveTab('profile'); setIsSidebarOpen(false); }} />
           <SidebarItem id="history" icon={History} label="Service Status" onClick={() => { setActiveTab('history'); setIsSidebarOpen(false); }} />
           <SidebarItem id="settings" icon={Settings} label="Settings" onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} />
@@ -389,7 +438,7 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight italic uppercase">
-              {activeTab === 'dashboard' ? 'Overview' : activeTab === 'cars' ? 'Garage' : activeTab === 'history' ? 'Service Status' : (activeTab === 'profile' || activeTab === 'settings') ? 'Customer Account' : 'Overview'}
+              {activeTab === 'dashboard' ? 'Overview' : activeTab === 'cars' ? 'Garage' : activeTab === 'history' ? 'Service Status' : activeTab === 'visual' ? 'Visual Diagnostics' : (activeTab === 'profile' || activeTab === 'settings') ? 'Customer Account' : 'Overview'}
             </h1>
             <div className="flex items-center gap-4 mt-2">
               <button 
@@ -498,7 +547,11 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
               {cars.map(car => (
-                <div key={car.id} className="glass-card p-8 group hover:border-accent/30 transition-all relative">
+                <div 
+                  key={car.id} 
+                  onClick={() => { setSelectedCarForTwin(car); setShowTwin(true); }}
+                  className="glass-card p-8 group hover:border-accent/30 transition-all relative cursor-pointer"
+                >
                   <div className="absolute top-6 right-6 flex space-x-2 opacity-0 group-hover:opacity-100 transition-all">
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleEditClick(car); }}
@@ -530,6 +583,8 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
           </motion.div>
         )}
 
+        {activeTab === 'visual' && <VideoDiagnostic cars={cars} />}
+
         {activeTab === 'history' && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="glass-card overflow-hidden">
             <div className="p-8 border-b border-white/10">
@@ -545,7 +600,7 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
                     <th className="px-10 py-6 font-black">Time Slot</th>
                     <th className="px-10 py-6 font-black">Service Cost</th>
                     <th className="px-10 py-6 font-black">Status</th>
-                    <th className="px-10 py-6 font-black text-right">Actions</th>
+                    <th className="px-10 py-6 font-black text-right">Evidence</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -563,7 +618,16 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
                       <td className="px-10 py-8">
                         <StatusBadge status={req.status} />
                       </td>
-                      <td className="px-10 py-8 text-right">
+                      <td className="px-10 py-8 text-right flex items-center justify-end gap-3">
+                        {req.status === 'COMPLETED' && (
+                          <button 
+                            onClick={() => setSelectedServiceForProof(req.id)}
+                            className="p-2 text-accent hover:bg-accent/10 rounded-xl transition-all"
+                            title="View Evidence"
+                          >
+                            <Film className="w-4 h-4" />
+                          </button>
+                        )}
                         <button 
                           onClick={() => deleteRequest(req.id)}
                           className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
@@ -878,6 +942,51 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
                   onChange={e => setNewCar({ ...newCar, number: e.target.value })}
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">VIN Number</label>
+                  <input className="input-field font-mono" placeholder="17-digit VIN" value={newCar.vin} onChange={e => setNewCar({...newCar, vin: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Purchase Date</label>
+                  <input type="date" className="input-field" value={newCar.purchaseDate} onChange={e => setNewCar({...newCar, purchaseDate: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fuel Type</label>
+                  <select className="input-field" value={newCar.fuelType} onChange={e => setNewCar({...newCar, fuelType: e.target.value})}>
+                    <option value="PETROL">Petrol</option>
+                    <option value="DIESEL">Diesel</option>
+                    <option value="ELECTRIC">Electric</option>
+                    <option value="HYBRID">Hybrid</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Transmission</label>
+                  <select className="input-field" value={newCar.transmission} onChange={e => setNewCar({...newCar, transmission: e.target.value})}>
+                    <option value="MANUAL">Manual</option>
+                    <option value="AUTOMATIC">Automatic</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Insurance Expiry</label>
+                  <input type="date" className="input-field" value={newCar.insuranceExpiry} onChange={e => setNewCar({...newCar, insuranceExpiry: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">PUC Expiry</label>
+                  <input type="date" className="input-field" value={newCar.pucExpiry} onChange={e => setNewCar({...newCar, pucExpiry: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Warranty Expiry</label>
+                  <input type="date" className="input-field" value={newCar.warrantyExpiry} onChange={e => setNewCar({...newCar, warrantyExpiry: e.target.value})} />
+                </div>
+              </div>
               <div className="flex space-x-4 pt-6">
                 <button onClick={() => setShowAddCar(false)} className="flex-1 py-4 bg-white/5 text-slate-400 font-bold rounded-2xl hover:bg-white/10 transition-colors border border-white/10 uppercase tracking-widest text-[10px]">Cancel</button>
                 <button onClick={handleAddCar} className="flex-1 btn-primary">Add Car</button>
@@ -920,29 +1029,79 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
                     setNewRequest({ 
                       ...newRequest, 
                       serviceType: type,
-                      cost: SERVICE_COSTS[type] || 0
+                      cost: 0
                     });
                   }}
                 >
                   <option value="" className="bg-[#08090c] text-slate-400">What does your car need?</option>
-                  {Object.entries(SERVICE_COSTS).map(([type, cost]) => (
-                    <option key={type} value={type} className="bg-[#08090c] text-white">
-                      {type} (₹{cost})
+                  {pricingConfigs.map(config => (
+                    <option key={config.id} value={config.serviceType} className="bg-[#08090c] text-white">
+                      {config.serviceType}
                     </option>
                   ))}
+                  <option value="Others" className="bg-[#08090c] text-accent font-black">OTHERS (Specify Below)</option>
                 </select>
               </div>
 
-              {newRequest.serviceType && (
-                <div className="p-4 rounded-2xl bg-accent/5 border border-accent/10 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
-                      <span className="text-accent font-black text-xs italic">₹</span>
+              {newRequest.serviceType === 'Others' && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Specify Service Type</label>
+                  <input 
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Wrap Installation, Custom Lighting..."
+                    value={newRequest.customServiceType}
+                    onChange={e => setNewRequest({ ...newRequest, customServiceType: e.target.value })}
+                  />
+                </motion.div>
+              )}
+
+              {newRequest.serviceType && priceEstimate && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }} 
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-6"
+                >
+                  <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Labor Cost</span>
+                      <span className="text-sm font-bold text-white">₹{priceEstimate.laborCost.toLocaleString()}</span>
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estimated Cost</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Parts Estimate</span>
+                      <span className="text-sm font-bold text-white">₹{priceEstimate.partsCost.toLocaleString()}</span>
+                    </div>
+                    {priceEstimate.seasonalMultiplier !== 1 && (
+                      <div className="flex justify-between items-center text-accent">
+                        <span className="text-[10px] font-black uppercase tracking-widest">Seasonal Multiplier</span>
+                        <span className="text-sm font-bold">x{priceEstimate.seasonalMultiplier}</span>
+                      </div>
+                    )}
+                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-xs font-black text-white uppercase italic">Total Smart Estimate</span>
+                      <span className="text-xl font-black text-accent italic">₹{priceEstimate.totalEstimate.toLocaleString()}</span>
+                    </div>
                   </div>
-                  <span className="text-xl font-black text-accent italic">₹{newRequest.cost}</span>
-                </div>
+
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 text-center">Market Comparison</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Authorized', value: priceEstimate.marketComparison.authorized_dealer, color: 'text-red-400' },
+                        { label: 'Carlofy', value: priceEstimate.totalEstimate, color: 'text-accent', highlight: true },
+                        { label: 'Local', value: priceEstimate.marketComparison.local_garage, color: 'text-slate-400' }
+                      ].map((m, i) => (
+                        <div key={i} className={cn(
+                          "p-3 rounded-xl border transition-all text-center",
+                          m.highlight ? "bg-accent/10 border-accent/20" : "bg-white/[0.01] border-white/5"
+                        )}>
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-tighter mb-1">{m.label}</p>
+                          <p className={cn("text-[10px] font-black italic", m.color)}>₹{Math.round(m.value).toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
               )}
 
               <div className="grid grid-cols-2 gap-6">
@@ -1020,6 +1179,52 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
                   onChange={e => setEditingCar({ ...editingCar, number: e.target.value })}
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">VIN Number</label>
+                  <input className="input-field font-mono" placeholder="17-digit VIN" value={editingCar.vin} onChange={e => setEditingCar({...editingCar, vin: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Purchase Date</label>
+                  <input type="date" className="input-field" value={editingCar.purchaseDate} onChange={e => setEditingCar({...editingCar, purchaseDate: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fuel Type</label>
+                  <select className="input-field" value={editingCar.fuelType} onChange={e => setEditingCar({...editingCar, fuelType: e.target.value})}>
+                    <option value="PETROL">Petrol</option>
+                    <option value="DIESEL">Diesel</option>
+                    <option value="ELECTRIC">Electric</option>
+                    <option value="HYBRID">Hybrid</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Transmission</label>
+                  <select className="input-field" value={editingCar.transmission} onChange={e => setEditingCar({...editingCar, transmission: e.target.value})}>
+                    <option value="MANUAL">Manual</option>
+                    <option value="AUTOMATIC">Automatic</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Insurance Expiry</label>
+                  <input type="date" className="input-field" value={editingCar.insuranceExpiry} onChange={e => setEditingCar({...editingCar, insuranceExpiry: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">PUC Expiry</label>
+                  <input type="date" className="input-field" value={editingCar.pucExpiry} onChange={e => setEditingCar({...editingCar, pucExpiry: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Warranty Expiry</label>
+                  <input type="date" className="input-field" value={editingCar.warrantyExpiry} onChange={e => setEditingCar({...editingCar, warrantyExpiry: e.target.value})} />
+                </div>
+              </div>
+
               <div className="flex space-x-4 pt-6">
                 <button onClick={() => { setShowEditCar(false); setEditingCar(null); }} className="flex-1 py-4 bg-white/5 text-slate-400 font-bold rounded-2xl hover:bg-white/10 transition-colors border border-white/10 uppercase tracking-widest text-[10px]">Cancel</button>
                 <button onClick={handleUpdateCar} className="flex-1 btn-primary">Update Car</button>
@@ -1028,6 +1233,60 @@ export const CustomerPortal = ({ user, onLogout }: CustomerPortalProps) => {
           </motion.div>
         </div>
       )}
+      {/* Vehicle Twin Overlay */}
+      <AnimatePresence>
+        {showTwin && selectedCarForTwin && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/90 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="w-full max-w-5xl"
+            >
+              <VehicleTwin 
+                car={selectedCarForTwin} 
+                onClose={() => { setShowTwin(false); setSelectedCarForTwin(null); }} 
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Repair Proof Modal */}
+      <AnimatePresence>
+        {selectedServiceForProof && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/95 backdrop-blur-2xl">
+             <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-6xl space-y-8"
+             >
+               <div className="flex justify-between items-center px-4">
+                  <div>
+                     <h2 className="text-2xl font-black text-white italic uppercase tracking-tight">Repair <span className="text-accent">Proof Vault</span></h2>
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Service ID: SR-{selectedServiceForProof}</p>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedServiceForProof(null)}
+                    className="p-4 rounded-2xl bg-white/5 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+               </div>
+               
+               <div className="glass-card p-10">
+                 <RepairProofGallery serviceId={selectedServiceForProof} />
+               </div>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

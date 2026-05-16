@@ -92,6 +92,22 @@ public class ServiceController {
         if (statusUpdate.getCost() != null) {
             request.setCost(statusUpdate.getCost());
         }
+
+        if (statusUpdate.getLaborCost() != null) {
+            request.setLaborCost(statusUpdate.getLaborCost());
+        }
+
+        if (statusUpdate.getPartsCost() != null) {
+            request.setPartsCost(statusUpdate.getPartsCost());
+        }
+        
+        if (statusUpdate.getTechnicianNotes() != null) {
+            request.setTechnicianNotes(statusUpdate.getTechnicianNotes());
+        }
+        
+        if (statusUpdate.getHealthImpact() != null) {
+            request.setHealthImpact(statusUpdate.getHealthImpact());
+        }
         
         ServiceRequest updated = serviceRepository.save(request);
 

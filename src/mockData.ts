@@ -11,7 +11,7 @@ export const MOCK_CARS: Car[] = [
 ];
 
 export const MOCK_REQUESTS: ServiceRequest[] = [
-  { id: 'r1', userId: '3', carId: 'c1', serviceType: 'Oil Change', requestDate: '2024-03-15', status: 'COMPLETED' },
-  { id: 'r2', userId: '3', carId: 'c2', serviceType: 'Brake Inspection', requestDate: '2024-03-20', status: 'IN_PROGRESS' },
-  { id: 'r3', userId: '3', carId: 'c3', serviceType: 'Engine Tuning', requestDate: '2024-03-22', status: 'PENDING' },
+  { id: 'r1', userId: '3', carId: 'c1', serviceType: 'Oil Change', requestDate: '2024-03-15', bookingDate: '2024-03-15', bookingTime: '10:00 AM', status: 'COMPLETED' },
+  { id: 'r2', userId: '3', carId: 'c2', serviceType: 'Brake Inspection', requestDate: '2024-03-20', bookingDate: '2024-03-20', bookingTime: '02:00 PM', status: 'IN_PROGRESS' },
+  { id: 'r3', userId: '3', carId: 'c3', serviceType: 'Engine Tuning', requestDate: '2024-03-22', bookingDate: '2024-03-22', bookingTime: '11:30 AM', status: 'PENDING' },
 ];

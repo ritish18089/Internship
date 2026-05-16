@@ -14,6 +14,7 @@ import java.util.List;
 
 import com.carlofy.backend.repository.ServiceRepository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/cars")
@@ -28,6 +29,12 @@ public class CarController {
     public List<Car> getMyCars(@AuthenticationPrincipal CustomUserDetails currentUser) {
         User user = userRepository.findById(currentUser.getId()).get();
         return carRepository.findByUser(user);
+    }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<Car> getAllCars() {
+        return carRepository.findAll();
     }
 
     @PostMapping
@@ -56,13 +63,23 @@ public class CarController {
     public ResponseEntity<Car> updateCar(@PathVariable Long id, @RequestBody Car carDetails, @AuthenticationPrincipal CustomUserDetails currentUser) {
         Car car = carRepository.findById(id).orElseThrow();
         
-        if (!car.getUser().getId().equals(currentUser.getId())) {
+        if (!car.getUser().getId().equals(currentUser.getId()) && !currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"))) {
             return ResponseEntity.status(403).build();
         }
 
         car.setBrand(carDetails.getBrand());
         car.setModel(carDetails.getModel());
         car.setNumber(carDetails.getNumber());
+        
+        // Update new fields
+        if (carDetails.getVin() != null) car.setVin(carDetails.getVin());
+        if (carDetails.getPurchaseDate() != null) car.setPurchaseDate(carDetails.getPurchaseDate());
+        if (carDetails.getFuelType() != null) car.setFuelType(carDetails.getFuelType());
+        if (carDetails.getTransmission() != null) car.setTransmission(carDetails.getTransmission());
+        if (carDetails.getMileage() != null) car.setMileage(carDetails.getMileage());
+        if (carDetails.getInsuranceExpiry() != null) car.setInsuranceExpiry(carDetails.getInsuranceExpiry());
+        if (carDetails.getPucExpiry() != null) car.setPucExpiry(carDetails.getPucExpiry());
+        if (carDetails.getWarrantyExpiry() != null) car.setWarrantyExpiry(carDetails.getWarrantyExpiry());
 
         Car updatedCar = carRepository.save(car);
         return ResponseEntity.ok(updatedCar);

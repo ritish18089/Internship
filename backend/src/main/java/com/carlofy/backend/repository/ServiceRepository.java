@@ -36,4 +36,7 @@ public interface ServiceRepository extends JpaRepository<ServiceRequest, Long> {
     @Transactional
     @Query("DELETE FROM ServiceRequest s WHERE s.car = :car")
     void deleteByCar(@Param("car") com.carlofy.backend.model.Car car);
+
+    @Query("SELECT s FROM ServiceRequest s WHERE s.car.id = :carId")
+    List<ServiceRequest> findByCarId(@Param("carId") Long carId);
 }

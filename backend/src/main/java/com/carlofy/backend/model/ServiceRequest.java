@@ -30,4 +30,17 @@ public class ServiceRequest {
     private Car car;
 
     private Double cost;
+    private Double laborCost;
+    private Double partsCost;
+
+    @Column(columnDefinition = "TEXT")
+    private String technicianNotes;
+    
+    private Integer healthImpact; // Score from -10 to 10
+
+    @OneToOne(mappedBy = "serviceRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+    private LogisticsRequest logistics;
+
+    @OneToMany(mappedBy = "serviceRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<RepairProof> repairProofs;
 }
