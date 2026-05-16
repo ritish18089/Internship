@@ -91,8 +91,8 @@ public class AuthController {
 
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
-            // For security, return OK even if the email is not found
-            return ResponseEntity.ok("OTP sent if account exists.");
+            // Temporary debug: return error so user knows if they typed the wrong email
+            return ResponseEntity.badRequest().body("Account with this email does not exist.");
         }
 
         // Generate 6-digit OTP
